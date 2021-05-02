@@ -113,8 +113,9 @@ public:
         std::string command_str;
         Command* command;
         time_t seconds_elapsed;
+        time_t time_to_kill;
         bool stopped;
-        JobEntry(Command *command, bool stopped, time_t time);
+        JobEntry(Command *command, bool stopped, time_t time, int duration = -1);
         ~JobEntry() = default;
         void print();
         void stopOrResume();
