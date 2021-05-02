@@ -1,0 +1,11 @@
+skeleton_smash/commands.o
+skeleton_smash/signals.o
+skeleton_smash/smash
+skeleton_smash/smash.o
+skeleton_smash/test_input1.txt
+skeleton_smash/test_expected_output1.txt
+skeleton_smash/test_output1.txt
+skeleton_smash/hello.txt
+skeleton_smash/loop
+skeleton_smash/loop.cpp
+build
