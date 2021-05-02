@@ -8,4 +8,5 @@ skeleton_smash/test_output1.txt
 skeleton_smash/hello.txt
 skeleton_smash/loop
 skeleton_smash/loop.cpp
+.vscode
 build
