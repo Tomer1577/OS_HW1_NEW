@@ -34,7 +34,7 @@ void ctrlZHandler(int sig_num) {
 void ctrlCHandler(int sig_num) 
 {
     // TODO: Add your implementation TOMER
-    std::cout <<endl<< "smash: got ctrl-C" << endl;
+    std::cout << "smash: got ctrl-C" << endl;
     SmallShell& shell = SmallShell::getInstance();
     Command* running_cmd = shell.getRunningCommand();
     if (running_cmd == nullptr)

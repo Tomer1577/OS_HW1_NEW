@@ -282,8 +282,8 @@ ChangeDirCommand::ChangeDirCommand(const char *cmdLine, char **parsed_cmd_line, 
 
 }
 
-JobsList::JobEntry::JobEntry(Command *command, bool stopped, time_t time, int duration)
-        : command_str(command->cmd_line), seconds_elapsed(time),time_to_kill(duration), stopped(stopped), process_id(command->process_id), command(command){
+JobsList::JobEntry::JobEntry(Command *command, bool stopped, time_t time)
+        : command_str(command->cmd_line), seconds_elapsed(time),stopped(stopped), process_id(command->process_id), command(command){
     SmallShell::getInstance().jobs_list->removeFinishedJobs();
     int max=0;
     for (auto job = SmallShell::getInstance().jobs_list->jobs_list.begin();
@@ -430,8 +430,7 @@ void ShowPidCommand::execute() {
     std::cout << "smash pid is " << SmallShell::getInstance().getProcessID() << endl;
 }
 
-KillCommand::KillCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(cmdLine),
-                                                                jobs_list(jobs) {
+KillCommand::KillCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(cmdLine), jobs_list(jobs) {
 
 }
 static bool isValidJobID(string num)
@@ -576,6 +575,7 @@ QuitCommand::QuitCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(c
 
 void QuitCommand::execute() {
     if (num_of_args >= 1 && strcmp(parsed_command_line[1], "kill") == 0) {
+        jobs->removeFinishedJobs();
         cout << "smash: sending SIGKILL signal to " << jobs->jobs_list.size() << " jobs:"<<endl;
         jobs->killAllJobs();
         //TODO: tomer said we do not have to send kill signal to smash process, we should ask about it!
