@@ -74,18 +74,15 @@ string _ltrim(const std::string& s)
     size_t start = s.find_first_not_of(WHITESPACE);
     return (start == std::string::npos) ? "" : s.substr(start);
 }
-
 string _rtrim(const std::string& s)
 {
     size_t end = s.find_last_not_of(WHITESPACE);
     return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
-
 string _trim(const std::string& s)
 {
     return _rtrim(_ltrim(s));
 }
-
 int _parseCommandLine(const char* cmd_line, char** args) {
     FUNC_ENTRY()
     int i = 0;
@@ -242,7 +239,7 @@ void GetCurrDirCommand::execute() {
     delete [] full_path;
 }
 
-Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]), is_pipe(false) {
+Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]) {
     strcpy(BKSignRemoved, cmd_line);
     _removeBackgroundSign(BKSignRemoved);
     parsed_command_line = new char* [COMMAND_MAX_ARGS + 1];
@@ -252,6 +249,7 @@ Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = true;
+    SmallShell::getInstance().is_pipeline_command = false;
     SmallShell::getInstance().forceRunningCommand(this);
 }
 
@@ -407,7 +405,10 @@ void JobsList::killAllJobs() {
         return;
     }
     for (auto & job : jobs_list) {
-        kill(job.process_id, 9);
+        if(kill(job.process_id, 9) == -1)
+        {
+            perror("smash error: kill failed");
+        }
         cout << job.process_id << ": " << job.command_str << endl;
     }
 }
@@ -427,7 +428,6 @@ ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) 
 
 void ShowPidCommand::execute() {
     std::cout << "smash pid is " << SmallShell::getInstance().getProcessID() << endl;
-//    std::cerr << ("smash pid is perororororor");
 }
 
 KillCommand::KillCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(cmdLine), jobs_list(jobs) {
@@ -459,7 +459,7 @@ void KillCommand::execute() {
     int signum = -atoi(parsed_command_line[1]);
     int job_id = atoi(parsed_command_line[2]);
     if (num_of_args != 2 || !isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
-        cout<< "smash error: kill: invalid arguments" <<endl;
+        cout<<("smash error: kill: invalid arguments")<<endl;
         return;
     }
     JobsList::JobEntry *job = jobs_list->getJobById(job_id);
@@ -585,6 +585,7 @@ void QuitCommand::execute() {
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = false;
+    SmallShell::getInstance().is_pipeline_command = false;
 }
 
 void ExternalCommand::execute() {
@@ -598,7 +599,7 @@ void ExternalCommand::execute() {
         return;
     }
     if (son) { // new process
-        if (!is_pipe) {
+        if(!shell.is_pipeline_command) {
             setpgrp(); // in this way, a process receiving some signals does not affects the smash process.
         }
         if (execl("/bin/bash","/bin/bash","-c",BKSignRemoved, nullptr)== -1) {
@@ -634,6 +635,7 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
     start_of_filename++;
     command_to_redirect = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(0, position).c_str());
     filename = _trim(trimmed_cmd_line.substr(start_of_filename, trimmed_cmd_line.length() - 1));
+    SmallShell::getInstance().is_pipeline_command = false;
 }
 void RedirectionCommand::execute() {
     //TODO: check if open failed??
@@ -698,6 +700,7 @@ PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line) {
     command1 = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(start1, end1).c_str());
     command2 = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(start2, end2).c_str());
 }
+
 
 void PipeCommand::execute() {
     command1->isBuiltCommand ? builtInExecute() : externalExecute();
@@ -785,7 +788,7 @@ void PipeCommand::externalExecute() {
     }
 }
 
-static int saveOriginalAndDuplicate(int pipe[2], bool should_duplicate_stderr){
+static int saveOriginalAndDuplicate(int my_pipe[2], bool should_duplicate_stderr){
     int original_out, original_err;
     if (should_duplicate_stderr) {
         original_err = dup(2); //duplicate stderr
