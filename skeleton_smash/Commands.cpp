@@ -74,15 +74,18 @@ string _ltrim(const std::string& s)
     size_t start = s.find_first_not_of(WHITESPACE);
     return (start == std::string::npos) ? "" : s.substr(start);
 }
+
 string _rtrim(const std::string& s)
 {
     size_t end = s.find_last_not_of(WHITESPACE);
     return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
+
 string _trim(const std::string& s)
 {
     return _rtrim(_ltrim(s));
 }
+
 int _parseCommandLine(const char* cmd_line, char** args) {
     FUNC_ENTRY()
     int i = 0;
@@ -239,7 +242,7 @@ void GetCurrDirCommand::execute() {
     delete [] full_path;
 }
 
-Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]) {
+Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]), is_pipe(false) {
     strcpy(BKSignRemoved, cmd_line);
     _removeBackgroundSign(BKSignRemoved);
     parsed_command_line = new char* [COMMAND_MAX_ARGS + 1];
@@ -249,7 +252,6 @@ Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = true;
-    SmallShell::getInstance().is_pipeline_command = false;
     SmallShell::getInstance().forceRunningCommand(this);
 }
 
@@ -283,7 +285,7 @@ ChangeDirCommand::ChangeDirCommand(const char *cmdLine, char **parsed_cmd_line, 
 }
 
 JobsList::JobEntry::JobEntry(Command *command, bool stopped, time_t time)
-        : command_str(command->cmd_line), seconds_elapsed(time),stopped(stopped), process_id(command->process_id), command(command){
+        : command_str(command->cmd_line), seconds_elapsed(time), stopped(stopped), process_id(command->process_id), command(command){
     SmallShell::getInstance().jobs_list->removeFinishedJobs();
     int max=0;
     for (auto job = SmallShell::getInstance().jobs_list->jobs_list.begin();
@@ -405,10 +407,7 @@ void JobsList::killAllJobs() {
         return;
     }
     for (auto & job : jobs_list) {
-        if(kill(job.process_id, 9) == -1)
-        {
-            perror("smash error: kill failed");
-        }
+        kill(job.process_id, 9);
         cout << job.process_id << ": " << job.command_str << endl;
     }
 }
@@ -428,6 +427,7 @@ ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) 
 
 void ShowPidCommand::execute() {
     std::cout << "smash pid is " << SmallShell::getInstance().getProcessID() << endl;
+//    std::cerr << ("smash pid is perororororor");
 }
 
 KillCommand::KillCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(cmdLine), jobs_list(jobs) {
@@ -459,7 +459,7 @@ void KillCommand::execute() {
     int signum = -atoi(parsed_command_line[1]);
     int job_id = atoi(parsed_command_line[2]);
     if (num_of_args != 2 || !isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
-        cout<<("smash error: kill: invalid arguments")<<endl;
+        cout<< "smash error: kill: invalid arguments" <<endl;
         return;
     }
     JobsList::JobEntry *job = jobs_list->getJobById(job_id);
@@ -585,7 +585,6 @@ void QuitCommand::execute() {
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = false;
-    SmallShell::getInstance().is_pipeline_command = false;
 }
 
 void ExternalCommand::execute() {
@@ -599,7 +598,7 @@ void ExternalCommand::execute() {
         return;
     }
     if (son) { // new process
-        if(!shell.is_pipeline_command) {
+        if (!is_pipe) {
             setpgrp(); // in this way, a process receiving some signals does not affects the smash process.
         }
         if (execl("/bin/bash","/bin/bash","-c",BKSignRemoved, nullptr)== -1) {
@@ -635,7 +634,6 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
     start_of_filename++;
     command_to_redirect = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(0, position).c_str());
     filename = _trim(trimmed_cmd_line.substr(start_of_filename, trimmed_cmd_line.length() - 1));
-    SmallShell::getInstance().is_pipeline_command = false;
 }
 void RedirectionCommand::execute() {
     //TODO: check if open failed??
@@ -682,6 +680,7 @@ void RedirectionCommand::cleanup(int duplicated_stdout) {
 }
 
 PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line) {
+    is_pipe = true;
     std::string trimmed_cmd_line(_trim(cmd_line));
     int pipe_position = trimmed_cmd_line.find('|');
     int start1 = 0;
@@ -696,76 +695,70 @@ PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line) {
         //TODO: throw error
         cout << "smash error: illegal use of >" << endl;
     }
-    SmallShell::getInstance().is_pipeline_command = true;
     command1 = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(start1, end1).c_str());
     command2 = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(start2, end2).c_str());
 }
 
 void PipeCommand::execute() {
-//    if (command1->isBuiltCommand) {
-//        builtInExecute();
+    command1->isBuiltCommand ? builtInExecute() : externalExecute();
+//    int separated_process = fork(); //is this fork necessary? no. but in this extra fork we can forget about retrieving the fd of the smash process to it's previous state
+//    if (separated_process == -1) {  // note that this process should not be treated as "separated" process, meaning if this process gets signal then the smash process should also get the signal.
+//        perror("smash error: fork failed");
+//        return;
 //    }
-//    if (!(command1->isBuiltCommand)){
-//        externalExecute();
+//    if (separated_process == 0) {
+//        int my_pipe[2];
+//        pipe(my_pipe);
+//        int pipe_process_id = fork();
+//        if (pipe_process_id == -1) {
+//            perror("smash error: fork failed");
+//            exit(0);
+//        }
+//        if (pipe_process_id == 0) {
+//            if (isAmpersandPipe) {
+//                dup2(my_pipe[1], 2);
+//                close(my_pipe[0]);
+//                close(my_pipe[1]);
+//            } else {
+//                dup2(my_pipe[1], 1);
+//                close(my_pipe[0]);
+//                close(my_pipe[1]);
+//            }
+//            command1->execute();
+//            exit(1);
+//        } else {
+//            waitpid(pipe_process_id, nullptr, WUNTRACED);
+//            dup2(my_pipe[0], 0);
+//            close(my_pipe[0]);
+//            close(my_pipe[1]);
+//            command2->execute();
+//            exit(1);
+//        }
 //    }
-    int separated_process = fork(); //is this fork necessary? no. but in this extra fork we can forget about retrieving the fd of the smash process to it's previous state
-    if (separated_process == -1) {  // note that this process should not be treated as "separated" process, meaning if this process gets signal then the smash process should also get the signal.
-        perror("smash error: fork failed");
-        return;
-    }
-    if (separated_process == 0) {
-        int my_pipe[2];
-        pipe(my_pipe);
-        int pipe_process_id = fork();
-        if (pipe_process_id == -1) {
-            perror("smash error: fork failed");
-            exit(0);
-        }
-        if (pipe_process_id == 0) {
-            if (isAmpersandPipe) {
-                dup2(my_pipe[1], 2);
-                close(my_pipe[0]);
-                close(my_pipe[1]);
-            } else {
-                dup2(my_pipe[1], 1);
-                close(my_pipe[0]);
-                close(my_pipe[1]);
-            }
-            command1->execute();
-            exit(1);
-        } else {
-            waitpid(pipe_process_id, nullptr, WUNTRACED);
-            dup2(my_pipe[0], 0);
-            close(my_pipe[0]);
-            close(my_pipe[1]);
-            command2->execute();
-            exit(1);
-        }
-    }
-    else {
-        SmallShell::getInstance().forceRunningCommand(this);
-        waitpid(separated_process, nullptr, WUNTRACED);
-        return;
-    }
+//    else {
+//        SmallShell::getInstance().forceRunningCommand(this);
+//        waitpid(separated_process, nullptr, WUNTRACED);
+//        return;
+//    }
 }
 
 void PipeCommand::externalExecute() {
-    int job_process_id = fork(); //is this fork necessary?
-    if (job_process_id == -1) {
+    bool should_duplicate_stderr = (isAmpersandPipe);
+    int pipe_process = fork(); // why is this fork necessary?
+    if (pipe_process == -1) {
         perror("smash error: fork failed");
         return;
     }
-//    Commands process
-    if (job_process_id == 0) {
+    if (pipe_process == 0) {
         int my_pipe[2];
         pipe(my_pipe);
-        int pipe_process_id = fork();
-        if (pipe_process_id == -1) {
+        int first_command_process = fork();
+        if (first_command_process == -1) {
             perror("smash error: fork failed");
             exit(1);
         }
-        if (pipe_process_id == 0) {
-            if (isAmpersandPipe) {
+        if (first_command_process == 0) {
+            if (should_duplicate_stderr) {
                 dup2(my_pipe[1], 2);
                 close(my_pipe[0]);
                 close(my_pipe[1]);
@@ -777,7 +770,7 @@ void PipeCommand::externalExecute() {
             command1->execute();
             exit(1);
         } else {
-            waitpid(pipe_process_id, NULL, WUNTRACED);
+            waitpid(first_command_process, nullptr, WUNTRACED);
             dup2(my_pipe[0], 0);
             close(my_pipe[0]);
             close(my_pipe[1]);
@@ -787,32 +780,43 @@ void PipeCommand::externalExecute() {
     }
     else {
         SmallShell::getInstance().forceRunningCommand(this);
-        waitpid(job_process_id, NULL, WUNTRACED);
+        waitpid(pipe_process    , nullptr, WUNTRACED);
         return;
     }
 }
 
-void PipeCommand::builtInExecute() {
+static int saveOriginalAndDuplicate(int pipe[2], bool should_duplicate_stderr){
+    int original_out, original_err;
+    if (should_duplicate_stderr) {
+        original_err = dup(2); //duplicate stderr
+        dup2(my_pipe[1], 2); // mt_pipe[1] is the new stderr
+        return original_err;
+    } else {
+        original_out = dup(1); //duplicate stdout
+        dup2(my_pipe[1], 1); // my_pipe[2] is the new stdout
+        return original_out;
+    }
+}
+static void cleanDuplication(int original, bool should_duplicate_stderr){
+    int file_dist = should_duplicate_stderr ? 2 : 1;
+    dup2(original, file_dist); // clean up and return original stderr
 
+}
+void PipeCommand::builtInExecute() {
     int my_pipe[2];
     pipe(my_pipe);
-    int original_out = dup(1); //duplicate stdout
-    int original_err = dup(2); //duplicate stderr
-    if (isAmpersandPipe) {
-        dup2(my_pipe[1], 2); // mt_pipe[1] is the new stderr
-    } else {
-        dup2(my_pipe[1], 1); // my_pipe[2] is the new stdout
-    }
+//   some commands, we won't be able to execute in a child process. For example : showpid cmd printing a different pid from expected (smash pid).
+    int original = saveOriginalAndDuplicate(my_pipe, isAmpersandPipe);
     command1->execute();
     close(my_pipe[1]);
-    dup2(original_out, 1); // clean up and return original stdout
-    dup2(original_err, 2); // clean up and return original stderr
+    cleanDuplication(original, isAmpersandPipe);
     int pid = fork();
     if (pid == -1) {
         perror("smash error: fork failed");
         return;
     }
     if (pid == 0) {
+        setpgrp();
         dup2(my_pipe[0], 0); // my_pipe[0] is the new stdin
         close(my_pipe[0]);
         close(my_pipe[1]);
