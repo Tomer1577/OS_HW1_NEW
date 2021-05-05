@@ -239,7 +239,7 @@ void GetCurrDirCommand::execute() {
     delete [] full_path;
 }
 
-Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]) {
+Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]),is_pipe(false) {
     strcpy(BKSignRemoved, cmd_line);
     _removeBackgroundSign(BKSignRemoved);
     parsed_command_line = new char* [COMMAND_MAX_ARGS + 1];
@@ -804,19 +804,17 @@ void CatCommand::execute() {
             perror("smash error: open failed");
             return;
         }
-
-        len = 1;
+        len = read(fd,&buffer,1);
         while(len != 0)
-        {
-            len = read(fd,&buffer,1);
+        { 
             if(len == -1)
             {
                 perror("smash error: read failed");
                 return;
             }
             write(1,&buffer,1);
+            len = read(fd,&buffer,1);
         }
-        std::cout<<std::endl;
         close(fd);
 
     }

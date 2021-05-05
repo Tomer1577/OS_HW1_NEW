@@ -14,6 +14,7 @@ public:
     std::string cmd_line;
     pid_t process_id;
     int num_of_args;
+    bool is_pipe;
     char** parsed_command_line;
     char* BKSignRemoved;
     Command(const char* cmd_line);
