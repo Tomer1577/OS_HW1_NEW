@@ -249,7 +249,6 @@ Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = true;
-    SmallShell::getInstance().is_pipeline_command = false;
     SmallShell::getInstance().forceRunningCommand(this);
 }
 
@@ -578,14 +577,12 @@ void QuitCommand::execute() {
         jobs->removeFinishedJobs();
         cout << "smash: sending SIGKILL signal to " << jobs->jobs_list.size() << " jobs:"<<endl;
         jobs->killAllJobs();
-        //TODO: tomer said we do not have to send kill signal to smash process, we should ask about it!
     }
-    exit(1);
+    exit(0);
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = false;
-    SmallShell::getInstance().is_pipeline_command = false;
 }
 
 void ExternalCommand::execute() {
@@ -599,7 +596,7 @@ void ExternalCommand::execute() {
         return;
     }
     if (son) { // new process
-        if(!shell.is_pipeline_command) {
+        if (!is_pipe) {
             setpgrp(); // in this way, a process receiving some signals does not affects the smash process.
         }
         if (execl("/bin/bash","/bin/bash","-c",BKSignRemoved, nullptr)== -1) {
@@ -618,6 +615,7 @@ void ExternalCommand::execute() {
     }
 }
 
+
 RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line), coutbuf(std::cout.rdbuf()) {
     string trimmed_cmd_line(_trim(cmd_line));
     int position = trimmed_cmd_line.find('>'); //can not be std::string::npos
@@ -635,7 +633,6 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
     start_of_filename++;
     command_to_redirect = SmallShell::getInstance().CreateCommand(trimmed_cmd_line.substr(0, position).c_str());
     filename = _trim(trimmed_cmd_line.substr(start_of_filename, trimmed_cmd_line.length() - 1));
-    SmallShell::getInstance().is_pipeline_command = false;
 }
 void RedirectionCommand::execute() {
     //TODO: check if open failed??
@@ -704,45 +701,6 @@ PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line) {
 
 void PipeCommand::execute() {
     command1->isBuiltCommand ? builtInExecute() : externalExecute();
-//    int separated_process = fork(); //is this fork necessary? no. but in this extra fork we can forget about retrieving the fd of the smash process to it's previous state
-//    if (separated_process == -1) {  // note that this process should not be treated as "separated" process, meaning if this process gets signal then the smash process should also get the signal.
-//        perror("smash error: fork failed");
-//        return;
-//    }
-//    if (separated_process == 0) {
-//        int my_pipe[2];
-//        pipe(my_pipe);
-//        int pipe_process_id = fork();
-//        if (pipe_process_id == -1) {
-//            perror("smash error: fork failed");
-//            exit(0);
-//        }
-//        if (pipe_process_id == 0) {
-//            if (isAmpersandPipe) {
-//                dup2(my_pipe[1], 2);
-//                close(my_pipe[0]);
-//                close(my_pipe[1]);
-//            } else {
-//                dup2(my_pipe[1], 1);
-//                close(my_pipe[0]);
-//                close(my_pipe[1]);
-//            }
-//            command1->execute();
-//            exit(1);
-//        } else {
-//            waitpid(pipe_process_id, nullptr, WUNTRACED);
-//            dup2(my_pipe[0], 0);
-//            close(my_pipe[0]);
-//            close(my_pipe[1]);
-//            command2->execute();
-//            exit(1);
-//        }
-//    }
-//    else {
-//        SmallShell::getInstance().forceRunningCommand(this);
-//        waitpid(separated_process, nullptr, WUNTRACED);
-//        return;
-//    }
 }
 
 void PipeCommand::externalExecute() {
@@ -758,7 +716,7 @@ void PipeCommand::externalExecute() {
         int first_command_process = fork();
         if (first_command_process == -1) {
             perror("smash error: fork failed");
-            exit(1);
+            exit(0);
         }
         if (first_command_process == 0) {
             if (should_duplicate_stderr) {
@@ -771,14 +729,14 @@ void PipeCommand::externalExecute() {
                 close(my_pipe[1]);
             }
             command1->execute();
-            exit(1);
+            exit(0);
         } else {
             waitpid(first_command_process, nullptr, WUNTRACED);
             dup2(my_pipe[0], 0);
             close(my_pipe[0]);
             close(my_pipe[1]);
             command2->execute();
-            exit(1);
+            exit(0);
         }
     }
     else {
@@ -824,7 +782,7 @@ void PipeCommand::builtInExecute() {
         close(my_pipe[0]);
         close(my_pipe[1]);
         command2->execute();
-        exit(1);
+        exit(0);
     } else {
         waitpid(pid, nullptr, WUNTRACED);
         return;
