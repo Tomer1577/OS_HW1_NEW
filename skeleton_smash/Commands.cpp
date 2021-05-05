@@ -452,7 +452,11 @@ KillCommand::KillCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(c
 }
 static bool isValidJobID(string num)
 {
-    for (int i = 0; i < num.length(); i++)
+    if(isdigit(num[0]) == 0 && num[0] != '-')
+    {
+        return false;
+    }
+    for (int i = 1; i < num.length(); i++)
         if (isdigit(num[i]) == 0) {
             return false;
         }
