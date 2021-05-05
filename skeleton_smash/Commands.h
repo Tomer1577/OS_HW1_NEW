@@ -13,8 +13,9 @@ public:
     bool isBuiltCommand;
     std::string cmd_line;
     pid_t process_id;
+    int is_pipe;
     int num_of_args;
-    bool is_pipe;
+    int job_id;
     char** parsed_command_line;
     char* BKSignRemoved;
     Command(const char* cmd_line);
@@ -126,7 +127,6 @@ public:
         bool operator==(const JobEntry& other) const;
     };
     // TODO: Add your data members
-    int max_job_id;
 public:
     JobsList() = default;
     ~JobsList() = default;
@@ -138,6 +138,7 @@ public:
     void removeJobById(int jobId);
     JobEntry * getLastJob(int* lastJobId);
     JobEntry *getLastStoppedJob();
+
     // TODO: Add extra methods or modify exisitng ones as needed
     bool noStoppedJobsFound();
     bool exists(int job_id);
@@ -219,7 +220,6 @@ public:
     // TODO: add extra methods as needed
     void updatePWD(const char *to_update);
     JobsList* jobs_list;
-
 };
 
 #endif //SMASH_COMMAND_H_

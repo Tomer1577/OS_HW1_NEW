@@ -22,10 +22,7 @@ void ctrlZHandler(int sig_num) {
 //    }
     if (waitpid(running_process, NULL, WNOHANG) == 0) { // if only the process is still alive (not zombie)
         shell.jobs_list->addJob(running_cmd, true);
-        if(kill(running_process, SIGSTOP) == -1)
-        {
-            perror("smash error: kill failed");
-        }
+        kill(running_process, SIGSTOP);
         shell.forceRunningCommand(nullptr);
         cout << "smash: process " << running_process << " was stopped" << endl;
     }

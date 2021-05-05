@@ -11,6 +11,7 @@
 //#include "../skeleton_smash/wait.h"
 #include <sys/wait.h>
 #define PATH_MAX	260
+#define NO_JOB_ID -1
 #include <iomanip>
 #include "Commands.h"
 
@@ -239,13 +240,22 @@ void GetCurrDirCommand::execute() {
     delete [] full_path;
 }
 
-Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]),is_pipe(false) {
+Command::Command(const char *cmd_line) : cmd_line(cmd_line), process_id(getpid()), BKSignRemoved(new char [strlen(cmd_line)]),is_pipe(false), job_id(NO_JOB_ID) {
     strcpy(BKSignRemoved, cmd_line);
     _removeBackgroundSign(BKSignRemoved);
     parsed_command_line = new char* [COMMAND_MAX_ARGS + 1];
     num_of_args = _parseCommandLine(BKSignRemoved, parsed_command_line) - 1;
-
 }
+
+//sleep 500
+//ztrl z
+//sleep 32
+//ctrl z
+//fg 1
+// crtl z
+//fg 2
+// crtl
+
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
     isBuiltCommand = true;
@@ -282,16 +292,23 @@ ChangeDirCommand::ChangeDirCommand(const char *cmdLine, char **parsed_cmd_line, 
 }
 
 JobsList::JobEntry::JobEntry(Command *command, bool stopped, time_t time)
-        : command_str(command->cmd_line), seconds_elapsed(time), stopped(stopped), process_id(command->process_id), command(command){
+        : command_str(command->cmd_line), seconds_elapsed(time), stopped(stopped), process_id(command->process_id), command(command) {
     SmallShell::getInstance().jobs_list->removeFinishedJobs();
-    int max=0;
-    for (auto job = SmallShell::getInstance().jobs_list->jobs_list.begin();
-         job != SmallShell::getInstance().jobs_list->jobs_list.end(); job++) {
-        if (job->job_id > max) {
-            max = job->job_id;
+    if (command->job_id == NO_JOB_ID) {
+        int max = 0;
+        for (auto job = SmallShell::getInstance().jobs_list->jobs_list.begin();
+             job != SmallShell::getInstance().jobs_list->jobs_list.end(); job++) {
+            if (job->job_id > max) {
+                max = job->job_id;
+            }
         }
+        job_id = max + 1;
+        command->job_id = job_id;
+//        std::cout << "new job id is " << job_id << std::endl;
+    } else {
+        job_id = command->job_id;
+//        std::cout << "no need to new job id" << std::endl;
     }
-    job_id = max + 1;
 }
 
 void JobsList::JobEntry::print() {
@@ -411,6 +428,7 @@ void JobsList::killAllJobs() {
         cout << job.process_id << ": " << job.command_str << endl;
     }
 }
+
 
 
 JobsCommand::JobsCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(cmdLine), jobs_list(jobs) {
@@ -806,7 +824,7 @@ void CatCommand::execute() {
         }
         len = read(fd,&buffer,1);
         while(len != 0)
-        { 
+        {
             if(len == -1)
             {
                 perror("smash error: read failed");
