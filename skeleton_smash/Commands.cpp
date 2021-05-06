@@ -475,11 +475,16 @@ static bool isValidSigunm(string signum) {
 }
 void KillCommand::execute() {
     jobs_list->removeFinishedJobs();
+    if (num_of_args != 2)
+    {
+        cout<<("smash error: kill: invalid arguments")<<endl;
+        return;
+    }
     string signum_str = parsed_command_line[1];
     string job_id_str = parsed_command_line[2];
     int signum = -atoi(parsed_command_line[1]);
     int job_id = atoi(parsed_command_line[2]);
-    if (num_of_args != 2 || !isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
+    if (!isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
         cout<<("smash error: kill: invalid arguments")<<endl;
         return;
     }
@@ -791,6 +796,8 @@ void PipeCommand::builtInExecute() {
 //   some commands, we won't be able to execute in a child process. For example : showpid cmd printing a different pid from expected (smash pid).
     int original = saveOriginalAndDuplicate(my_pipe, isAmpersandPipe);
     command1->execute();
+    //JobsList* JOBSSS =  SmallShell::getInstance().jobs_list;
+    //int X = JOBSSS->jobs_list.begin()->job_id;
     close(my_pipe[1]);
     cleanDuplication(original, isAmpersandPipe);
     int pid = fork();

@@ -9,4 +9,6 @@ skeleton_smash/hello.txt
 skeleton_smash/loop
 skeleton_smash/loop.cpp
 .vscode
+skeleton_smash/cmake-build-debug
+.idea
 build

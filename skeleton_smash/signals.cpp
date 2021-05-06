@@ -22,7 +22,11 @@ void ctrlZHandler(int sig_num) {
 //    }
     if (waitpid(running_process, NULL, WNOHANG) == 0) { // if only the process is still alive (not zombie)
         shell.jobs_list->addJob(running_cmd, true);
-        kill(running_process, SIGSTOP);
+        if(kill(running_process, SIGSTOP))
+        {
+            perror("smash error: kill failed");
+            return;
+        }
         shell.forceRunningCommand(nullptr);
         cout << "smash: process " << running_process << " was stopped" << endl;
     }
@@ -42,6 +46,7 @@ void ctrlCHandler(int sig_num)
     if(kill(running_process, SIGKILL))
     {
         perror("smash error: kill failed");
+        return;
     }
     shell.forceRunningCommand(nullptr);
     cout << "smash: process " << running_process << " was killed" << endl;//do even in have nothing?
