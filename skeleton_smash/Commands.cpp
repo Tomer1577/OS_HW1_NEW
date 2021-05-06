@@ -476,13 +476,17 @@ static bool isValidSigunm(string signum) {
     return true;
 }
 void KillCommand::execute() {
-    jobs_list->removeFinishedJobs();
+//    jobs_list->removeFinishedJobs();
+    if (num_of_args != 2){
+        cerr << "smash error: kill: invalid arguments" << endl;
+        return;
+    }
     string signum_str = parsed_command_line[1];
     string job_id_str = parsed_command_line[2];
     int signum = -atoi(parsed_command_line[1]);
     int job_id = atoi(parsed_command_line[2]);
-    if (num_of_args != 2 || !isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
-        cout<<("smash error: kill: invalid arguments")<<endl;
+    if (!isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
+        cerr << "smash error: kill: invalid arguments" << endl;
         return;
     }
     JobsList::JobEntry *job = jobs_list->getJobById(job_id);
@@ -598,7 +602,7 @@ QuitCommand::QuitCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(c
 
 void QuitCommand::execute() {
     if (num_of_args >= 1 && strcmp(parsed_command_line[1], "kill") == 0) {
-//        jobs->removeFinishedJobs();
+        jobs->removeFinishedJobs();
         cout << "smash: sending SIGKILL signal to " << jobs->jobs_list.size() << " jobs:"<<endl;
         jobs->killAllJobs();
     }
