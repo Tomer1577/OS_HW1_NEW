@@ -25,7 +25,9 @@ void ctrlZHandler(int sig_num) {
         if(kill(running_process, SIGSTOP) == -1)
         {
             perror("smash error: kill failed");
-        }        shell.forceRunningCommand(nullptr);
+            return;
+        }
+        shell.forceRunningCommand(nullptr);
         cout << "smash: process " << running_process << " was stopped" << endl;
     }
 }
@@ -41,7 +43,7 @@ void ctrlCHandler(int sig_num)
         return;//return if nothing?
     }
     pid_t running_process = running_cmd->process_id;
-    if(kill(running_process, SIGKILL))
+    if(kill(running_process, SIGKILL) == -1)
     {
         perror("smash error: kill failed");
         return;

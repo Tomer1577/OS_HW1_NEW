@@ -202,7 +202,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command *cmd = CreateCommand(cmd_line);
     if (cmd != nullptr) {
         forceRunningCommand(cmd); //?
-        jobs_list->removeFinishedJobs();
+//        jobs_list->removeFinishedJobs();
         cmd->execute();
     }
 }
@@ -476,7 +476,7 @@ static bool isValidSigunm(string signum) {
     return true;
 }
 void KillCommand::execute() {
-//    jobs_list->removeFinishedJobs();
+    jobs_list->removeFinishedJobs();
     if (num_of_args != 2){
         cerr << "smash error: kill: invalid arguments" << endl;
         return;
@@ -508,7 +508,7 @@ ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList *jobs)
 
 void ForegroundCommand::execute() {
     int job_id = 0;
-//    jobs->removeFinishedJobs();
+    jobs->removeFinishedJobs();
     if (num_of_args > 1) {
         cerr << "smash error: fg: invalid arguments" << endl;
         return;
@@ -556,7 +556,7 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs)
 
 
 void BackgroundCommand::execute() {
-//    jobs->removeFinishedJobs();
+    jobs->removeFinishedJobs();
     JobsList::JobEntry *job;
     if (num_of_args > 1) {
         cerr << "smash error: bg: invalid arguments" << endl;
@@ -601,8 +601,8 @@ QuitCommand::QuitCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(c
 }
 
 void QuitCommand::execute() {
+    jobs->removeFinishedJobs();
     if (num_of_args >= 1 && strcmp(parsed_command_line[1], "kill") == 0) {
-        jobs->removeFinishedJobs();
         cout << "smash: sending SIGKILL signal to " << jobs->jobs_list.size() << " jobs:"<<endl;
         jobs->killAllJobs();
     }
@@ -614,6 +614,7 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
 }
 
 void ExternalCommand::execute() {
+    SmallShell::getInstance().jobs_list->removeFinishedJobs();
     pid_t pid = fork();
     bool fork_error = (pid == -1);
     bool son = (pid == 0);
@@ -663,6 +664,7 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
     filename = _trim(trimmed_cmd_line.substr(start_of_filename, trimmed_cmd_line.length() - 1));
 }
 void RedirectionCommand::execute() {
+    SmallShell::getInstance().jobs_list->removeFinishedJobs();
     //TODO: check if open failed??
     std::ofstream new_out;
 //     prepare(new_out);
@@ -728,6 +730,7 @@ PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line) {
 
 
 void PipeCommand::execute() {
+    SmallShell::getInstance().jobs_list->removeFinishedJobs();
     command1->isBuiltCommand ? builtInExecute() : externalExecute();
 }
 
@@ -821,6 +824,7 @@ CatCommand::CatCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 }
 
 void CatCommand::execute() {
+    SmallShell::getInstance().jobs_list->removeFinishedJobs();
     int fd;
     int len;
     char buffer;
