@@ -476,7 +476,7 @@ static bool isValidSigunm(string signum) {
     return true;
 }
 void KillCommand::execute() {
-//    jobs_list->removeFinishedJobs();
+    jobs_list->removeFinishedJobs();
     if (num_of_args != 2){
         cerr << "smash error: kill: invalid arguments" << endl;
         return;
@@ -508,7 +508,7 @@ ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList *jobs)
 
 void ForegroundCommand::execute() {
     int job_id = 0;
-//    jobs->removeFinishedJobs();
+    jobs->removeFinishedJobs();
     if (num_of_args > 1) {
         cerr << "smash error: fg: invalid arguments" << endl;
         return;
@@ -602,7 +602,7 @@ QuitCommand::QuitCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(c
 
 void QuitCommand::execute() {
     if (num_of_args >= 1 && strcmp(parsed_command_line[1], "kill") == 0) {
-//        jobs->removeFinishedJobs();
+        jobs->removeFinishedJobs();
         cout << "smash: sending SIGKILL signal to " << jobs->jobs_list.size() << " jobs:"<<endl;
         jobs->killAllJobs();
     }
@@ -649,7 +649,10 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
     int position = trimmed_cmd_line.find('>'); //can not be std::string::npos
     int start_of_filename = position;
     if (position >= trimmed_cmd_line.length() - 1) {
-        //TODO: Throw error if redirection is at end if cmd_line - that is there is no output file
+        //kThrow error if redirection is at end if cmd_line - that is there is no output file
+        std::cout << "smash error: redirect: illegal use" << std::endl;
+        return;
+
 //        cout << "smash error";
     }
     if (cmd_line[position + 1] == '>') {
