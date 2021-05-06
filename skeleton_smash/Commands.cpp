@@ -61,7 +61,11 @@ static COMMAND_KEY_WORD getCommand(string& cmd){
 }
 static bool isPipeCommand(int num_of_args, char** parsed_cmd_line){
     for (int i = 0; i < num_of_args + 1 ; i++) {
-        if (((strcmp(parsed_cmd_line[i], "|") == 0 && (i != num_of_args) )|| strcmp(parsed_cmd_line[i], "|&") == 0)) {
+        if (strcmp(parsed_cmd_line[i], "|") == 0 || strcmp(parsed_cmd_line[i], "|&") == 0) {
+            return true;
+        }
+        string str(parsed_cmd_line[i]);
+        if (string::npos != string(str).find('|') ||  string::npos != string(str).find("|&")) {
             return true;
         }
     }
@@ -195,14 +199,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
         }
         return;
     }
-    // for example:
     Command *cmd = CreateCommand(cmd_line);
     if (cmd != nullptr) {
         forceRunningCommand(cmd); //?
         jobs_list->removeFinishedJobs();
         cmd->execute();
     }
-    // Please note that you must fork smash process for some commands (e.g., isBuiltCommand commands....)
 }
 
 std::string SmallShell::getPrompt() {
@@ -264,12 +266,12 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
 
 void ChangeDirCommand::execute() {
     if (num_of_args > 1) {
-        std::cerr << "smash error: cd: too many arguments" << std::endl;
+        cerr << "smash error: cd: too many arguments" << std::endl;
         return;
     }
     if (strcmp(path,"-") == 0) {
         if (strcmp(last_pwd, "") == 0) {
-            std::cerr << "smash error: cd: OLDPWD not set" << std::endl;
+            cerr << "smash error: cd: OLDPWD not set" << std::endl;
             return;
         }
         strcpy(path,last_pwd);
@@ -475,22 +477,17 @@ static bool isValidSigunm(string signum) {
 }
 void KillCommand::execute() {
     jobs_list->removeFinishedJobs();
-    if (num_of_args != 2)
-    {
-        cout<<("smash error: kill: invalid arguments")<<endl;
-        return;
-    }
     string signum_str = parsed_command_line[1];
     string job_id_str = parsed_command_line[2];
     int signum = -atoi(parsed_command_line[1]);
     int job_id = atoi(parsed_command_line[2]);
-    if (!isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
+    if (num_of_args != 2 || !isValidSigunm(signum_str) || !isValidJobID(job_id_str) || signum < 0) {
         cout<<("smash error: kill: invalid arguments")<<endl;
         return;
     }
     JobsList::JobEntry *job = jobs_list->getJobById(job_id);
     if (job == nullptr) {
-        cout << "smash error: kill: job-id " + to_string(job_id) +  " does not exist" << endl;
+        cerr << "smash error: kill: job-id " + to_string(job_id) +  " does not exist" << endl;
         return;
     }
     if (kill(job->process_id, signum ) == -1) {
@@ -507,22 +504,22 @@ ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList *jobs)
 
 void ForegroundCommand::execute() {
     int job_id = 0;
-    jobs->removeFinishedJobs();
+//    jobs->removeFinishedJobs();
     if (num_of_args > 1) {
-        cout << "smash error: fg: invalid arguments" << endl;
+        cerr << "smash error: fg: invalid arguments" << endl;
         return;
     }
     // given the job id
     if (num_of_args == 1) {
         if (!isValidJobID(parsed_command_line[1])) {
-            cout << "smash error: fg: invalid arguments" << endl;
+            cerr << "smash error: fg: invalid arguments" << endl;
             return;
         }
         job_id = atoi(parsed_command_line[1]);
     }
     if (num_of_args == 0) {
         if (jobs->jobs_list.empty()) { // if no arguments but jobs_;ist is empty
-            cout << "smash error: fg: jobs list is empty" << endl;
+            cerr << "smash error: fg: jobs list is empty" << endl;
             return;
         }
         for (auto & job : jobs->jobs_list) {
@@ -532,7 +529,7 @@ void ForegroundCommand::execute() {
         }
     }
     if (!(jobs->exists(job_id))) {
-        cout<<"smash error: fg: job-id " + std::to_string(job_id) + " does not exist"<<endl;
+        cerr << "smash error: fg: job-id " + std::to_string(job_id) + " does not exist" << endl;
         return;
     }
     JobsList::JobEntry *job_to_force_run = jobs->getJobById(job_id);
@@ -555,25 +552,25 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs)
 
 
 void BackgroundCommand::execute() {
-    jobs->removeFinishedJobs();
+//    jobs->removeFinishedJobs();
     JobsList::JobEntry *job;
     if (num_of_args > 1) {
-        cout << ("smash error: bg: invalid arguments") << endl;
+        cerr << "smash error: bg: invalid arguments" << endl;
         return;
     }
     if (num_of_args == 1) {
         if (!isValidJobID(parsed_command_line[1])) {
-            cout << "smash error: fg: invalid arguments" << endl;
+            cerr << "smash error: bg: invalid arguments" << endl;
             return;
         }
         job = jobs->getJobById(atoi(parsed_command_line[1]));
         if (!job) {
-            cout << "smash error: bg: job-id " + std::to_string(atoi(parsed_command_line[1])) + " does not exist"
+            cerr << "smash error: bg: job-id " + std::to_string(atoi(parsed_command_line[1])) + " does not exist"
                  << endl;
             return;
         }
         if (!(job->stopped)) {
-            cout << "smash error: bg: job-id " + std::to_string(atoi(parsed_command_line[1])) +
+            cerr << "smash error: bg: job-id " + std::to_string(atoi(parsed_command_line[1])) +
                     " is already running in the background" << endl;
             return;
         }
@@ -583,7 +580,7 @@ void BackgroundCommand::execute() {
             return;
         }
         if (jobs->noStoppedJobsFound()) {
-            cout << "smash error: bg: there is no stopped jobs to resume" << endl;
+            cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
             return;
         }
         job = jobs->getLastStoppedJob();
@@ -601,7 +598,7 @@ QuitCommand::QuitCommand(const char *cmdLine, JobsList *jobs) : BuiltInCommand(c
 
 void QuitCommand::execute() {
     if (num_of_args >= 1 && strcmp(parsed_command_line[1], "kill") == 0) {
-        jobs->removeFinishedJobs();
+//        jobs->removeFinishedJobs();
         cout << "smash: sending SIGKILL signal to " << jobs->jobs_list.size() << " jobs:"<<endl;
         jobs->killAllJobs();
     }
@@ -796,8 +793,6 @@ void PipeCommand::builtInExecute() {
 //   some commands, we won't be able to execute in a child process. For example : showpid cmd printing a different pid from expected (smash pid).
     int original = saveOriginalAndDuplicate(my_pipe, isAmpersandPipe);
     command1->execute();
-    //JobsList* JOBSSS =  SmallShell::getInstance().jobs_list;
-    //int X = JOBSSS->jobs_list.begin()->job_id;
     close(my_pipe[1]);
     cleanDuplication(original, isAmpersandPipe);
     int pid = fork();
@@ -825,6 +820,9 @@ void CatCommand::execute() {
     int fd;
     int len;
     char buffer;
+    if ( num_of_args == 0 ){
+        std::cerr << "smash error: cat: not enough arguments" << std::endl;
+    }
     for (int i = 0; i < num_of_args; i++)
     {
         fd = open(parsed_command_line[i+1],O_RDONLY);
